@@ -65,7 +65,7 @@
     <style>
       body {
         font-family: "Poppins", sans-serif;
-        background: linear-gradient(135deg, #020617 0%, #0f172a 100%);
+        background-color: black;
         color: #e2e8f0;
       }
 
@@ -307,11 +307,27 @@
                   AI-powered diagnostic result
                 </p>
               </div>
-              <span
-                class="px-4 py-2 bg-green-900/30 text-green-400 rounded-full text-sm font-semibold mt-3 sm:mt-0 border border-green-800"
-              >
-                <i class="fas fa-check-circle mr-1"></i> Diagnosis
-              </span>
+              <div class="flex items-center mt-3 sm:mt-0">
+                <span
+                  class="px-4 py-2 bg-green-900/30 text-green-400 rounded-full text-sm font-semibold border border-green-800"
+                >
+                  <i class="fas fa-check-circle mr-1"></i> Diagnosis
+                </span>
+                <button
+                  id="read-aloud-btn"
+                  class="ml-3 p-2 bg-primary/20 text-primary rounded-full hover:bg-primary/30 transition-all border border-primary/30"
+                  title="Read Aloud"
+                >
+                  <i class="fas fa-volume-up"></i>
+                </button>
+                <button
+                  id="stop-reading-btn"
+                  class="ml-2 p-2 bg-red-900/20 text-red-400 rounded-full hover:bg-red-900/30 transition-all border border-red-800 hidden"
+                  title="Stop Reading"
+                >
+                  <i class="fas fa-volume-mute"></i>
+                </button>
+              </div>
             </div>
 
             <div class="mb-8">
@@ -414,10 +430,14 @@
       const errorMessage = document.getElementById("error-message");
       const resultsSection = document.getElementById("results");
       const voiceBtn = document.getElementById("voice-btn");
+      const readAloudBtn = document.getElementById("read-aloud-btn");
+      const stopReadingBtn = document.getElementById("stop-reading-btn");
 
       let selectedSymptoms = [];
       let recognition = null;
       let allSymptoms = [];
+      let speechSynthesis = window.speechSynthesis;
+      let currentUtterance = null;
 
       // Initialize voice recognition if available
       function initVoiceRecognition() {
@@ -605,6 +625,7 @@
         searchResults.classList.add("hidden");
         resultsSection.classList.add("hidden");
         errorMessage.classList.add("hidden");
+        stopReading();
       }
 
       function showLoading() {
@@ -620,6 +641,87 @@
         diagnoseBtn.innerHTML = `
           <i class="fas fa-stethoscope mr-2"></i> Analyze Symptoms`;
         diagnoseBtn.disabled = false;
+      }
+
+      // Stop text-to-speech
+      function stopReading() {
+        if (speechSynthesis.speaking) {
+          speechSynthesis.cancel();
+        }
+        readAloudBtn.classList.remove("hidden");
+        stopReadingBtn.classList.add("hidden");
+      }
+
+      // Read text aloud
+      function readAloud() {
+        // Stop any current speech
+        stopReading();
+
+        // Get all the text content to read
+        const diseaseName = document.getElementById("disease-name").textContent;
+        const diseaseDesc = document.getElementById(
+          "disease-description"
+        ).textContent;
+
+        // Get all recommendations
+        const precautions = Array.from(
+          document.querySelectorAll("#precautions-list li")
+        )
+          .map((li) => li.textContent.trim())
+          .join(". ");
+        const medications = Array.from(
+          document.querySelectorAll("#medications-list li")
+        )
+          .map((li) => li.textContent.trim())
+          .join(". ");
+        const workouts = Array.from(
+          document.querySelectorAll("#workouts-list li")
+        )
+          .map((li) => li.textContent.trim())
+          .join(". ");
+        const diets = Array.from(document.querySelectorAll("#diets-list li"))
+          .map((li) => li.textContent.trim())
+          .join(". ");
+
+        // Combine all text
+        const fullText = `
+          Diagnosis: ${diseaseName}. 
+          Condition Overview: ${diseaseDesc}.
+          Precautions: ${precautions}.
+          Medications: ${medications}.
+          Recommended Activities: ${workouts}.
+          Diet Recommendations: ${diets}.
+          Important Notice: This AI-powered diagnosis is for informational purposes only and should not replace professional medical advice.
+        `;
+
+        // Create speech utterance
+        currentUtterance = new SpeechSynthesisUtterance(fullText);
+        currentUtterance.rate = 0.8;
+        currentUtterance.pitch = 0.9;
+        currentUtterance.volume = 1;
+
+        // Update UI when speaking starts
+        currentUtterance.onstart = function () {
+          readAloudBtn.classList.add("hidden");
+          stopReadingBtn.classList.remove("hidden");
+        };
+
+        // Update UI when speaking ends
+        currentUtterance.onend = function () {
+          readAloudBtn.classList.remove("hidden");
+          stopReadingBtn.classList.add("hidden");
+        };
+
+        // Handle errors
+        currentUtterance.onerror = function (event) {
+          console.error("SpeechSynthesis error:", event);
+          readAloudBtn.classList.remove("hidden");
+          stopReadingBtn.classList.add("hidden");
+          showError("Text-to-speech failed. Please try again.");
+        };
+
+        // Speak the text
+        speechSynthesis.speak(currentUtterance);
       }
 
       function displayResults(data) {
@@ -764,6 +866,12 @@
           showError("Voice recognition not supported in your browser");
         }
       });
+
+      // Read aloud button event listener
+      readAloudBtn.addEventListener("click", readAloud);
+
+      // Stop reading button event listener
+      stopReadingBtn.addEventListener("click", stopReading);
 
       // Initialize the app when page loads
       document.addEventListener("DOMContentLoaded", () => {
